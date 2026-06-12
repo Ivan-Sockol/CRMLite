@@ -1,14 +1,22 @@
+from jsonschema.validators import create
 from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from .models import User, Company, Storage
+from drf_spectacular.utils import extend_schema_view, extend_schema
 from .serializers import (
     UserSerializer, CompanySerializer,
     StorageSerializer, RegisterSerializer
 )
-
-
+@extend_schema_view(
+    list=extend_schema(tags=['👥 Пользователи']),
+    create=extend_schema(tags=['👥 Пользователи']),
+    retrieve=extend_schema(tags=['👥 Пользователи']),
+    update=extend_schema(tags=['👥 Пользователи']),
+    partial_update=extend_schema(tags=['👥 Пользователи']),
+    destroy=extend_schema(tags=['👥 Пользователи']),
+)
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -30,7 +38,14 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-
+@extend_schema_view(
+    list=extend_schema(tags=["🏢 Компании"]),
+    create=extend_schema(tags=["🏢 Компании"]),
+    retrieve=extend_schema(tags=["🏢 Компании"]),
+    update=extend_schema(tags=["🏢 Компании"]),
+    partial_update=extend_schema(tags=["🏢 Компании"]),
+    destroy=extend_schema(tags=["🏢 Компании"]),
+)
 class CompanyViewSet(viewsets.ModelViewSet):
     # Аналог queryset = Company.objects.all(), отличие в том, что пользователь не увидит чужие компании и зависит от
     # текущего пользователя
@@ -119,7 +134,14 @@ class CompanyViewSet(viewsets.ModelViewSet):
         emplyees = User.objects.filte(company=company)
         serializer = UserSerializer(emplyees, many=True)
 
-
+@extend_schema_view(
+    list=extend_schema(tags=["📦 Склады"]),
+    create=extend_schema(tags=["📦 Склады"]),
+    retrieve=extend_schema(tags=["📦 Склады"]),
+    update=extend_schema(tags=["📦 Склады"]),
+    partial_update=extend_schema(tags=["📦 Склады"]),
+    destroy=extend_schema(tags=["📦 Склады"]),
+)
 class StorageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
