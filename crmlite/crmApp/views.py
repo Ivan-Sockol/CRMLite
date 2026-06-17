@@ -145,7 +145,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
     destroy=extend_schema(tags=["📦 Склады"]),
 )
 class StorageViewSet(viewsets.ModelViewSet):
-
+    serializer_class = StorageSerializer
     def get_queryset(self):
         user = self.request.user
         if not user.company:

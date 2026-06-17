@@ -43,4 +43,4 @@ class StorageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Storage
-        fields = ['id', 'address', 'company']
+        fields = ['id', 'address', 'company', 'company_name']
