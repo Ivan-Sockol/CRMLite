@@ -132,7 +132,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
         if not company or company.owner != request.user:
             raise PermissionDenied('Только владелец может видеть сотрудников')
 
-        employees = User.objects.filte(company=company)
+        employees = User.objects.filter(company=company)
         serializer = UserSerializer(employees, many=True)
         return Response(serializer.data)
 
