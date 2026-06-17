@@ -35,7 +35,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
+    serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
 @extend_schema_view(
@@ -47,12 +47,13 @@ class RegisterView(generics.CreateAPIView):
     destroy=extend_schema(tags=["🏢 Компании"]),
 )
 class CompanyViewSet(viewsets.ModelViewSet):
+    serializer_class = CompanySerializer
     # Аналог queryset = Company.objects.all(), отличие в том, что пользователь не увидит чужие компании и зависит от
     # текущего пользователя
     def get_queryset(self):
         user = self.request.user
         if user.is_authenticated and user.company:
-            return Company.objects.filte(id=user.company.id)
+            return Company.objects.filter(id=user.company.id)
         return Company.objects.none()
 
     # Переопределяем метод create
@@ -98,7 +99,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
 
         partial = kwargs.pop('partial', False)
         serializer = self.get_serializer(company, data=request.data, partial=partial)
-        serializer.is_valid(raise_exeption=True)
+        serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
         return Response(serializer.data)
@@ -131,8 +132,9 @@ class CompanyViewSet(viewsets.ModelViewSet):
         if not company or company.owner != request.user:
             raise PermissionDenied('Только владелец может видеть сотрудников')
 
-        emplyees = User.objects.filte(company=company)
-        serializer = UserSerializer(emplyees, many=True)
+        employees = User.objects.filte(company=company)
+        serializer = UserSerializer(employees, many=True)
+        return Response(serializer.data)
 
 @extend_schema_view(
     list=extend_schema(tags=["📦 Склады"]),
@@ -158,7 +160,7 @@ class StorageViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Вы не являетесь владельцем компании')
 
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exeption=True)
+        serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -169,7 +171,7 @@ class StorageViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         storage = self.get_object()
 
-        if not request.user.company or request.user != storage.company:
+        if not request.user.company or request.user.company != storage.company:
             raise PermissionDenied('Вы не связаны с этой компанией')
 
         serializer = self.get_serializer(storage)
@@ -188,7 +190,7 @@ class StorageViewSet(viewsets.ModelViewSet):
 
         partial = kwargs.pop('partial', False)
         serializer = self.get_serializer(storage, data=request.data, partial=partial)
-        serializer.is_valid(raise_exeption=True)
+        serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
         return Response(serializer.data)

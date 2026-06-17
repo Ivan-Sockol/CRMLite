@@ -65,12 +65,12 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'CRM API',
     'DESCRIPTION': 'API для управления компаниями и складами',
     'VERSION': 'v1',
-    'SERVER_INCLUDE_SCHEMA': False,
+    'SERVE_INCLUDE_SCHEMA': False,
     'SECURITY': [{'BearerAuth': []}],
     'SECURITY_DEFINITIONS': {
         'BearerAuth': {
             'type': 'http',
-            'schema': 'bearer',
+            'scheme': 'bearer',
             'bearerFormat': 'JWT',
             'description': 'Введите токен: Bearer <ваш токен>',
         },

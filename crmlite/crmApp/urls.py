@@ -14,14 +14,14 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'companies', views.CompanyViewSet, basename='company')
-router.register(r'storage', views.StorageViewSet, basename='storage')
+router.register(r'storages', views.StorageViewSet, basename='storage')
 router.register(r'users', views.UserViewSet, basename='user')
 # router.register(r'register', views.RegisterView, basename='register')
 
 
 urlpatterns = [
 
-    path('api.register/', views.RegisterView.as_view(), name='register'),
+    path('api/register/', views.RegisterView.as_view(), name='register'),
 
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
 

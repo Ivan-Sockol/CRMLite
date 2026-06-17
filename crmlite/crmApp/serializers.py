@@ -33,7 +33,8 @@ class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = ['id', 'title', 'inn', 'owner', 'owner_email']
-        read_only_fields = ['id', 'owner']
+        read_only_fields = ['id', 'owner', 'owner_email']
+
 
 
 class StorageSerializer(serializers.ModelSerializer):
