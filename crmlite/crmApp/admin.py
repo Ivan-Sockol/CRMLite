@@ -28,7 +28,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ('company',)
     search_fields = ('name',)
 
-@admin.register(SupplyProduct)
+
 class SupplyProductInline(admin.TabularInline):
     model = SupplyProduct
     extra = 1

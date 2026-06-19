@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Company, Storage
+from .models import User, Company, Storage, Supplier, Supply, SupplyProduct, Product
 
 
 #
@@ -44,3 +44,50 @@ class StorageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Storage
         fields = ['id', 'address', 'company', 'company_name']
+
+class SupplierSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.title', read_only=True)
+
+    class Meta:
+        model = Supplier
+        fields = ['id', 'name', 'inn', 'company', 'company_name']
+        read_only_fields = ['id', 'company']
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    profit_per_unit = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    company_name = serializers.CharField(source='company.title', read_only=True)
+
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'description',
+                  'quantity', 'purchase_price',
+                  'sale_price', 'company', 'profit_per_unit', 'company_name']
+        read_only_fields = ['id', 'company']
+
+class SupplyProductSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+
+    class Meta:
+        model = SupplyProduct
+        fields = ['id', 'product', 'product_name', 'quantity', 'purchase_price_at_supply']
+
+class SupplySerializer(serializers.ModelSerializer):
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    company_name = serializers.CharField(source='company.title', read_only=True)
+    products = SupplyProductSerializer(source='supplyproduct_set', many=True, read_only=True)
+
+    class Meta:
+        model = Supply
+        fields = ['id', 'supplier', 'supplier_name', 'company',
+                  'company_name', 'delivery_date', 'products']
+        read_only_fields = ['id', 'company', 'delivery_date']
+
+class AddProductSupplySerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+    purchase_price_at_supply = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+
+
