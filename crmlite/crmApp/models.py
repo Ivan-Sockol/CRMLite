@@ -2,6 +2,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import make_password
+
 # Кастомный менеджер для регистрации пользователя
 class CustomUserManager(BaseUserManager):
 
@@ -101,6 +102,12 @@ class Product(models.Model):
                                 on_delete=models.CASCADE,
                                 related_name='products',
                                 verbose_name='Компания')
+    storage = models.ForeignKey('Storage',
+                                on_delete=models.CASCADE,
+                                null=True,
+                                blank=True,
+                                related_name='products',
+                                verbose_name='Склад')
 
     class Meta:
         verbose_name='Товар'

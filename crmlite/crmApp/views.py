@@ -1,15 +1,20 @@
+from importlib.metadata import pass_none
+from itertools import product
+from trace import Trace
+
 from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from .models import User, Company, Storage, Supplier, Supply, Product, SupplyProduct
-from drf_spectacular.utils import extend_schema_view, extend_schema
+from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
 from .serializers import (
     UserSerializer, CompanySerializer,
     StorageSerializer, RegisterSerializer,
     SupplierSerializer, SupplySerializer,
     SupplyProductSerializer, ProductSerializer,
-    AddProductSupplySerializer
+    AddProductSupplySerializer, CreateSupplySerializer,
+    AttachUserSerializer,
 )
 @extend_schema_view(
     list=extend_schema(tags=['👥 Пользователи']),
@@ -41,12 +46,12 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 @extend_schema_view(
-    list=extend_schema(tags=["🏢 Компании"]),
-    create=extend_schema(tags=["🏢 Компании"]),
-    retrieve=extend_schema(tags=["🏢 Компании"]),
-    update=extend_schema(tags=["🏢 Компании"]),
-    partial_update=extend_schema(tags=["🏢 Компании"]),
-    destroy=extend_schema(tags=["🏢 Компании"]),
+    list=extend_schema(tags=['🏢 Компании']),
+    create=extend_schema(tags=['🏢 Компании']),
+    retrieve=extend_schema(tags=['🏢 Компании']),
+    update=extend_schema(tags=['🏢 Компании']),
+    partial_update=extend_schema(tags=['🏢 Компании']),
+    destroy=extend_schema(tags=['🏢 Компании']),
 )
 class CompanyViewSet(viewsets.ModelViewSet):
     serializer_class = CompanySerializer
@@ -138,13 +143,76 @@ class CompanyViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(employees, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary='Закрепить пользователя за компанией',
+        description='Доступно только владельцу компании. Принимает email или user_id пользователя',
+        request=AttachUserSerializer,
+        responses={
+            20: OpenApiResponse(description='Пользователь успешно привязан'),
+            400: OpenApiResponse(description='Ошибка валидации'),
+            403: OpenApiResponse(description='Нет прав'),
+            404: OpenApiResponse(description='Пользователь не найден')
+        }
+    )
+    @action(detail=True, methods=['POST'])
+    def attach_user(self, request, pk=None):
+        company= request.user.company
+        if not company:
+            raise PermissionDenied(
+                'У вас нет компании для закрепления пользователя'
+            )
+        if company.owner != request.user:
+            raise PermissionDenied(
+                'Только владелец компании может закрепить пользователей'
+            )
+        serilazer = AttachUserSerializer(data=request.data)
+        serilazer.is_valid(raise_exception=True)
+
+        user_to_attach = serilazer.context.get('user_to_attach')
+        if not user_to_attach:
+            return Response(
+                {'error': 'Пользователь не найден'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        if user_to_attach.company and user_to_attach.company != company:
+            return Response(
+                {'error': 'Этот пользователь привязан к другой компании'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if user_to_attach.company == company:
+            return Response(
+                {'error': 'Пользователь уже привязан к этой компании'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user_to_attach.company = company
+        user_to_attach.is_company_owner = False
+        user_to_attach.save(update_fields=['company', 'is_company_owner'])
+
+        return Response(
+            {
+                'status': 'Пользователь успешно привязан к компании',
+                'user': {
+                    'id': user_to_attach.id,
+                    'email': user_to_attach.email,
+                    'company': user_to_attach.company.id
+                }
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+
+
+
+
+
 @extend_schema_view(
-    list=extend_schema(tags=["📦 Склады"]),
-    create=extend_schema(tags=["📦 Склады"]),
-    retrieve=extend_schema(tags=["📦 Склады"]),
-    update=extend_schema(tags=["📦 Склады"]),
-    partial_update=extend_schema(tags=["📦 Склады"]),
-    destroy=extend_schema(tags=["📦 Склады"]),
+    list=extend_schema(tags=['📦 Склады']),
+    create=extend_schema(tags=['📦 Склады']),
+    retrieve=extend_schema(tags=['📦 Склады']),
+    update=extend_schema(tags=['📦 Склады']),
+    partial_update=extend_schema(tags=['📦 Склады']),
+    destroy=extend_schema(tags=['📦 Склады']),
 )
 class StorageViewSet(viewsets.ModelViewSet):
     serializer_class = StorageSerializer
@@ -239,10 +307,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return Product.objects.filter(company=user.company)
 
     def perform_create(self, serializer):
-        user = self.request.user
-        if not user.company:
-            raise PermissionDenied('У вас нет компании для привязки товара')
-        serializer.save(company=user.company)
+        serializer.save(company=self.request.user.company, quantity=0)
 
     @action(detail=True, methods=['POST'])
     def adjust_quantity(self, request, pk=None):
@@ -277,6 +342,72 @@ class SupplyViewSet(viewsets.ModelViewSet):
             return Supply.objects.none()
         return Supply.objects.filter(company=user.company)
 
+    @extend_schema(
+        summary='Создание поставки с товарами',
+        description='Создаем новую поставку и добавляем в нее список товаров',
+        request=CreateSupplySerializer,
+        responses={
+            201: SupplySerializer,
+            400: OpenApiResponse(description='Ошибка валидации'),
+            403: OpenApiResponse(description='Нет прав'),
+            404: OpenApiResponse(description='Поставщик или товар не найдены')
+        }
+    )
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        company = user.company
+        # Проверка наличия компании
+        if not company:
+            raise PermissionDenied('У вас ент компании для создания поставки')
+        # Валидация входящих данных через сериализатор
+        serializer = CreateSupplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validate_data = serializer.validated_data
+        supplier_id = validate_data['supplier']
+        items = validate_data['items']
+
+        try:
+            supplier = Supplier.objects.get(id=supplier_id, company=company)
+        except Supplier.DoesNotExist:
+            return Response(
+                {'error': 'Поставщик не найден или не принадлежит вашей компании'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        product_to_add = []
+        for item in items:
+            try:
+                product = Product.objects.get(id=item['product_id'], company=company)
+                product_to_add.append((product, item))
+            except Product.DoesNotExist:
+                return Response(
+                    {'error': f'Товар с ID {item['product_id']} не найден или не принадлежит вашей компании'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        supply = Supply.objects.create(
+            supplier=supplier,
+            company=company
+        )
+
+        supply_products = []
+        for product, item in product_to_add:
+            quantity = item['quantity']
+            purchase_price = item.get('purchase_price_at_supply', product.purchase_price)
+
+            supply_product = SupplyProduct.objects.create(
+                supply=supply,
+                product=product,
+                quantity=quantity,
+                purchase_price_at_supply=purchase_price)
+
+            supply_products.append(supply_product)
+
+            product.quantity += int(quantity)
+            product.save(update_fields=['quantity'])
+
+        response_serializer = self.get_serializer(supply)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
     def perform_create(self, serializer):
         user = self.request.user
         if not user.company:
@@ -290,37 +421,52 @@ class SupplyViewSet(viewsets.ModelViewSet):
         else:
             raise PermissionDenied('Необходимо указать поставщика')
         serializer.save(company=user.company, supplier=supplier)
+
     @extend_schema(
         summary='Добавить товар в поставку',
         request=AddProductSupplySerializer,
-        responses={201: SupplyProductSerializer}
+        responses={
+            201: SupplyProductSerializer,
+            400: OpenApiResponse(description='Ошибка валидации'),
+            403: OpenApiResponse(description='Нет прав'),
+            404: OpenApiResponse(description='Поставщик или товар не найдены')
+        }
     )
-    @action(detail=True, methods=['POST'])
+    @action(detail=True, methods=['POST'], url_path='add_product')
     def add_product(self, request, pk=None):
+        supply = self.get_object()
+        if supply.company.owner != request.user:
+            raise PermissionDenied('Только владелец компании может добавлять товары в поставку')
+
         serializer = AddProductSupplySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        supply = self.get_object()
-        product_id = request.data.get('product_id')
-        quantity = request.data.get('quantity')
-        purchase_price = request.data.get('purchase_price_at_supply')
+        product_id = serializer.validated_data['product_id']
+        quantity = serializer.validated_data['quantity']
+        purchase_price = serializer.validated_data.get('purchase_price_at_supply')
 
-        if not all([product_id, quantity, purchase_price]):
-            return Response({'error': 'Необходимо указать product_id, quantity и purchase_price_at_supply'},
-                            status=status.HTTP_400_BAD_REQUEST)
         try:
             product = Product.objects.get(id=product_id, company=request.user.company)
         except Product.DoesNotExist:
-            return Response({'error': 'Товар не найден или не принадлежит вашей компании'},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Товар не найден или не принадлежит вашей компании'},
+                status=status.HTTP_404_NOT_FOUND)
+
+        #Проверка на дублироание
+        if SupplyProduct.objects.filter(supply=supply, product=product).exists():
+            return Response(
+                {'error': 'Этот товар уже добавлен в данную поставку'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         supply_product = SupplyProduct.objects.create(
             supply=supply,
             product=product,
             quantity=quantity,
-            purchase_price_at_supply=purchase_price
+            purchase_price_at_supply=purchase_price or product.purchase_price
         )
         product.quantity += int(quantity)
-        product.save()
+        product.save(update_fields=['quantity'])
 
         serializer = SupplyProductSerializer(supply_product)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

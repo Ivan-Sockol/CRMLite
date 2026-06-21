@@ -88,6 +88,63 @@ class AddProductSupplySerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
     purchase_price_at_supply = serializers.DecimalField(max_digits=10, decimal_places=2)
 
+class CreateSupplySerializer(serializers.Serializer):
+    supplier = serializers.IntegerField()
+    items = serializers.ListField(
+        child=AddProductSupplySerializer(),
+        min_length=1,
+        help_text='Список товаров в поставке'
+    )
+
+    def validate_supplier(self, value):
+        return value
+
+    def validated_items(self, value):
+        products_ids = [item['product_id'] for item in value]
+        if len(products_ids) != len(set(products_ids)):
+            raise serializers.ValidationError('Товары в поставке должны быть уникальными')
+
+        return value
+
+class AttachUserSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=False, help_text='Email пользователя')
+    user_id = serializers.IntegerField(required=False, help_text='ID пользователя')
+
+    def validate(self, data):
+        email = data.get('email')
+        user_id = data.get('user_id')
+
+        if not email and not user_id:
+            raise serializers.ValidationError(
+                'Необходимо указать email или user_id пользователя'
+            )
+        if email and user_id:
+            raise serializers.ValidationError(
+                'Укажите только одно поле: email или user_id'
+            )
+        return data
+
+    def validate_email(self, value):
+        try:
+            user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                f'Пользователь с email "{value}" не найден'
+            )
+        self.context['user_to_attach'] = user
+        return value
+
+    def validate_user_id(self, value):
+        try:
+            user = User.objects.get(id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                f'Пользователь с ID "{value}" не найден'
+            )
+        self.context['user_to_attach'] = user
+        return value
+
+
 
 
 
