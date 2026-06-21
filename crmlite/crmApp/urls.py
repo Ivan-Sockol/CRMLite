@@ -16,7 +16,10 @@ router = DefaultRouter()
 router.register(r'companies', views.CompanyViewSet, basename='company')
 router.register(r'storages', views.StorageViewSet, basename='storage')
 router.register(r'users', views.UserViewSet, basename='user')
-# router.register(r'register', views.RegisterView, basename='register')
+router.register(r'suppliers', views.SupplierViewSet, basename='supplier')
+router.register(r'products', views.ProductViewSet, basename='product')
+router.register(r'supplies', views.SupplyViewSet, basename='supply')
+
 
 
 urlpatterns = [
@@ -33,7 +36,7 @@ urlpatterns = [
 
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 
-    path('api/redoc', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     path('api/', include(router.urls)),
 ]
