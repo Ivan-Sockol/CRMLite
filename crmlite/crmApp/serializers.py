@@ -19,7 +19,7 @@ class RegisterSerializer(serializers.ModelSerializer):  # Для регистр�
         fields = ['email', 'password']
 
     def create(self, validated_data):
-        user = User.objects.create_user(  # Хэшируем пароль
+        user = User.objects.create_user(  # Хешируем пароль
             email=validated_data['email'],
             password=validated_data['password']
         )
@@ -99,9 +99,9 @@ class CreateSupplySerializer(serializers.Serializer):
     def validate_supplier(self, value):
         return value
 
-    def validated_items(self, value):
-        products_ids = [item['product_id'] for item in value]
-        if len(products_ids) != len(set(products_ids)):
+    def validate_items(self, value):
+        product_ids = [item['product_id'] for item in value]
+        if len(product_ids) != len(set(product_ids)):
             raise serializers.ValidationError('Товары в поставке должны быть уникальными')
 
         return value

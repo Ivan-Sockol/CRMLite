@@ -56,11 +56,12 @@ class User(AbstractUser):
 
 class Company(models.Model):
     """Модель компании"""
-    inn = models.CharField(max_length=100, unique=True)
+    inn = models.CharField(max_length=20, unique=True)
     title = models.CharField(max_length=250)
     owner = models.OneToOneField(User,
                                  on_delete=models.CASCADE,
-                                 related_name='owned_company')
+                                 related_name='owned_company',
+                                 verbose_name='Владелец')
 
     def __str__(self):
         return f'{self.title} - [{self.inn}]'
@@ -78,7 +79,7 @@ class Storage(models.Model):
 
 class Supplier(models.Model):
     name = models.CharField(max_length=250)
-    inn = models.CharField(max_length=100, unique=True)
+    inn = models.CharField(max_length=100)
     company = models.ForeignKey('Company',
                                 on_delete=models.CASCADE,
                                 related_name='suppliers',
@@ -104,8 +105,6 @@ class Product(models.Model):
                                 verbose_name='Компания')
     storage = models.ForeignKey('Storage',
                                 on_delete=models.CASCADE,
-                                null=True,
-                                blank=True,
                                 related_name='products',
                                 verbose_name='Склад')
 
@@ -141,7 +140,7 @@ class Supply(models.Model):
         verbose_name_plural='Поставки'
 
     def __str__(self):
-        return f'Поставка #{self.id}, от {self.delivery_date.strftime('%d.%m.%Y %H:%M')}'
+        return f'Поставка #{self.id}, от {self.delivery_date.strftime("%d.%m.%Y %H:%M")}'
 
 class SupplyProduct(models.Model):
     supply = models.ForeignKey('Supply',
@@ -158,4 +157,4 @@ class SupplyProduct(models.Model):
         unique_together=('supply', 'product')
 
     def __str__(self):
-        return f'{self.product.name} в поставке #{self.product.id}'
+        return f'{self.product.name} в поставке #{self.supply.id}'

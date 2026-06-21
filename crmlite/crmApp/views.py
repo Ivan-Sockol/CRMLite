@@ -1,7 +1,3 @@
-from importlib.metadata import pass_none
-from itertools import product
-from trace import Trace
-
 from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
@@ -16,6 +12,8 @@ from .serializers import (
     AddProductSupplySerializer, CreateSupplySerializer,
     AttachUserSerializer,
 )
+
+
 @extend_schema_view(
     list=extend_schema(tags=['👥 Пользователи']),
     create=extend_schema(tags=['👥 Пользователи']),
@@ -45,6 +43,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
 
+
 @extend_schema_view(
     list=extend_schema(tags=['🏢 Компании']),
     create=extend_schema(tags=['🏢 Компании']),
@@ -55,6 +54,7 @@ class RegisterView(generics.CreateAPIView):
 )
 class CompanyViewSet(viewsets.ModelViewSet):
     serializer_class = CompanySerializer
+
     # Аналог queryset = Company.objects.all(), отличие в том, что пользователь не увидит чужие компании и зависит от
     # текущего пользователя
     def get_queryset(self):
@@ -156,7 +156,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
     )
     @action(detail=True, methods=['POST'])
     def attach_user(self, request, pk=None):
-        company= request.user.company
+        company = request.user.company
         if not company:
             raise PermissionDenied(
                 'У вас нет компании для закрепления пользователя'
@@ -165,10 +165,10 @@ class CompanyViewSet(viewsets.ModelViewSet):
             raise PermissionDenied(
                 'Только владелец компании может закрепить пользователей'
             )
-        serilazer = AttachUserSerializer(data=request.data)
-        serilazer.is_valid(raise_exception=True)
+        serialazer = AttachUserSerializer(data=request.data)
+        serialazer.is_valid(raise_exception=True)
 
-        user_to_attach = serilazer.context.get('user_to_attach')
+        user_to_attach = serialazer.context.get('user_to_attach')
         if not user_to_attach:
             return Response(
                 {'error': 'Пользователь не найден'},
@@ -194,16 +194,11 @@ class CompanyViewSet(viewsets.ModelViewSet):
                 'user': {
                     'id': user_to_attach.id,
                     'email': user_to_attach.email,
-                    'company': user_to_attach.company.id
+                    'company': user_to_attach.company.id if user_to_attach.company else None
                 }
             },
             status=status.HTTP_200_OK
         )
-
-
-
-
-
 
 
 @extend_schema_view(
@@ -257,7 +252,7 @@ class StorageViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Только владелец компании может редактировать склад')
 
         if storage.company != company:
-            raise PermissionDenied('Этот склад ен принадлежит вашей компании')
+            raise PermissionDenied('Этот склад не принадлежит вашей компании')
 
         partial = kwargs.pop('partial', False)
         serializer = self.get_serializer(storage, data=request.data, partial=partial)
@@ -265,6 +260,8 @@ class StorageViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
 
         return Response(serializer.data)
+
+
 @extend_schema_view(
     list=extend_schema(tags=['🏪 Поставщик']),
     create=extend_schema(tags=['🏪 Поставщик']),
@@ -288,6 +285,8 @@ class SupplierViewSet(viewsets.ModelViewSet):
         if not user.company:
             raise PermissionDenied('У вас нет компании, для того чтобы привязать поставщика')
         serializer.save(company=user.company)
+
+
 @extend_schema_view(
     list=extend_schema(tags=['🛍️ Товар']),
     create=extend_schema(tags=['🛍️ Товар']),
@@ -322,7 +321,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response({'status': 'Количество обновлено', 'new_quantity': product.quantity})
         except ValueError:
             return Response({'error': 'quantity должно быть целым числом'},
-                           status=status.HTTP_400_BAD_REQUEST)
+                            status=status.HTTP_400_BAD_REQUEST)
+
 
 @extend_schema_view(
     list=extend_schema(tags=['🛵️ Поставка']),
@@ -358,7 +358,7 @@ class SupplyViewSet(viewsets.ModelViewSet):
         company = user.company
         # Проверка наличия компании
         if not company:
-            raise PermissionDenied('У вас ент компании для создания поставки')
+            raise PermissionDenied('У вас нет компании для создания поставки')
         # Валидация входящих данных через сериализатор
         serializer = CreateSupplySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -381,7 +381,7 @@ class SupplyViewSet(viewsets.ModelViewSet):
                 product_to_add.append((product, item))
             except Product.DoesNotExist:
                 return Response(
-                    {'error': f'Товар с ID {item['product_id']} не найден или не принадлежит вашей компании'},
+                    {'error': f'Товар с ID {item["product_id"]} не найден или не принадлежит вашей компании'},
                     status=status.HTTP_404_NOT_FOUND
                 )
         supply = Supply.objects.create(
@@ -452,7 +452,7 @@ class SupplyViewSet(viewsets.ModelViewSet):
                 {'error': 'Товар не найден или не принадлежит вашей компании'},
                 status=status.HTTP_404_NOT_FOUND)
 
-        #Проверка на дублироание
+        # Проверка на дублирование
         if SupplyProduct.objects.filter(supply=supply, product=product).exists():
             return Response(
                 {'error': 'Этот товар уже добавлен в данную поставку'},
@@ -470,15 +470,3 @@ class SupplyViewSet(viewsets.ModelViewSet):
 
         serializer = SupplyProductSerializer(supply_product)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-
-
-
-
-
-
-
-
-
-
