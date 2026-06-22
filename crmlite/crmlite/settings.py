@@ -9,27 +9,28 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
-
+import os
+from dotenv import load_dotenv
 from pathlib import Path
 
-from django.conf.global_settings import AUTH_USER_MODEL
-from drf_spectacular.settings import SPECTACULAR_DEFAULTS
+# Загрузка переменных окружения
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6+(s2czju#p=x8&in)lw*&26!5)lxrd#s6c0f2x5@tjb**r#qt'
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError('SECRET_KEY не установлен в переменных окружения!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -41,23 +42,27 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    # Мои приложения
+    'crmApp',
+
     # DRF
     'rest_framework',
     'drf_spectacular',
     'rest_framework_simplejwt',
 
-    # Мои приложения
-    'crmApp',
-
 ]
 # Настройка DRF
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ( # Указывает как DRF проверять подлинность пользователя при каждом запросе
+    # Указывает как DRF проверять подлинность пользователя при каждом запросе
+    # (наличие JWT-токена)
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'DEFAULT_PERMISSION_CLASSES': ( # Определяет, каким пользователям разрешен доступ к API
+    # Только авторизованные пользователи могут обращаться к API (неавторизованные получат ошибку 401 Unauthorized)
+    'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    # Автоматическая генерация OpenAPI схемы на основе представлений и сериализаторов
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 # Настройка drf-spectacular
@@ -79,6 +84,7 @@ SPECTACULAR_SETTINGS = {
 
 # Настройка времени жизни токенов
 from datetime import timedelta
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -113,7 +119,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'crmlite.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
@@ -123,7 +128,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -142,7 +146,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
+# Говорим Django, что используем свою модель пользователя вместо стандартной <User>
 AUTH_USER_MODEL = 'crmApp.User'
 
 # Internationalization
@@ -155,7 +159,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
