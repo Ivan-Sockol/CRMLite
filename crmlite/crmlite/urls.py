@@ -20,6 +20,6 @@ from django.urls import path, include
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('crmApp.urls'))
+    path('admin/', admin.site.urls), # Админка Django
+    path('', include('crmApp.urls')) # url's из приложения crmApp
 ]
