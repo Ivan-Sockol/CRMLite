@@ -19,7 +19,7 @@ router.register(r'users', views.UserViewSet, basename='user')
 router.register(r'suppliers', views.SupplierViewSet, basename='supplier')
 router.register(r'products', views.ProductViewSet, basename='product')
 router.register(r'supplies', views.SupplyViewSet, basename='supply')
-
+router.register(r'sales', views.SaleViewSet, basename='sale')
 
 
 urlpatterns = [

@@ -2,7 +2,8 @@ from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
-from .models import User, Company, Storage, Supplier, Supply, Product, SupplyProduct
+from django.db import transaction
+from .models import User, Company, Storage, Supplier, Supply, Product, SupplyProduct, Sale, ProductSale
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse
 from .serializers import (
     UserSerializer, CompanySerializer,
@@ -10,7 +11,7 @@ from .serializers import (
     SupplierSerializer, SupplySerializer,
     SupplyProductSerializer, ProductSerializer,
     AddProductSupplySerializer, CreateSupplySerializer,
-    AttachUserSerializer,
+    AttachUserSerializer, SaleSerializer, SaleCreateSerializer
 )
 
 
@@ -470,3 +471,90 @@ class SupplyViewSet(viewsets.ModelViewSet):
 
         serializer = SupplyProductSerializer(supply_product)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@extend_schema_view(
+    list=extend_schema(tags=['💰 Продажи']),
+    create=extend_schema(tags=['💰 Продажи']),
+    retrieve=extend_schema(tags=['💰 Продажи']),
+    update=extend_schema(tags=['💰 Продажи']),
+    partial_update=extend_schema(tags=['💰 Продажи']),
+    destroy=extend_schema(tags=['💰 Продажи'])
+)
+class SaleViewSet(viewsets.ModelViewSet):
+    serializer_class = SaleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.company:
+            return Sale.objects.none()
+        return Sale.objects.filter(company=user.company)
+
+    @extend_schema(
+        summary='Создание продажи',
+        description='Создаёт новую продажу для компании пользователя. Проверяет наличие товаров на складе.',
+        request=SaleCreateSerializer,
+        responses={
+            201: SaleSerializer,
+            400: OpenApiResponse(description='Ошибка валидации или недостаточно товара'),
+            403: OpenApiResponse(description='Нет прав'),
+            404: OpenApiResponse(description='Товар не найден')
+        }
+    )
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        company = user.company
+
+        if not company:
+            raise PermissionDenied('У вас нет компании для создания продажи')
+
+        serializer = SaleCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validate_data = serializer.validated_data
+        buyer_name = validate_data['buyer_name']
+        products_data = validate_data['product_sales']
+
+        product_to_sell = []
+        for item in products_data:
+            product_id = item['product']
+            quantity = item['quantity']
+            try:
+                product = Product.objects.get(id=product_id, company=company)
+            except Product.DoesNotExist:
+                return Response(
+                    {'error': f'Товар с ID {product_id} не найден или не принадлежит вашей компании'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            if product.quantity < quantity:
+                return Response(
+                    {'error': f'Недостаточно товара {product.name}. Доступно: {product.quantity}, запрошено: '
+                              f'{quantity}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            product_to_sell.append((product, quantity))
+        # Создание продажи и обновление остатков (в одной транзакции)
+        with transaction.atomic():
+            sale = Sale.objects.create(
+                buyer_name=buyer_name,
+                company=company
+            )
+            for product, quantity in product_to_sell:
+                # Создаем запись в промежуточной таблице
+                ProductSale.objects.create(
+                    sale=sale,
+                    product=product,
+                    quantity=quantity
+                )
+                # Уменьшаем количество товара на складе
+                product.quantity -= quantity
+                product.save(update_fields=['quantity'])
+
+        response_serializer = self.get_serializer(sale)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        sale = self.get_object()
+        if sale.company != request.user.company:
+            raise PermissionDenied('Вы не можете удалить эту продажу')
+        return super().destroy(request, *args, **kwargs)

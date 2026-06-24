@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Company, Storage, Supplier, Supply, SupplyProduct, Product
+from .models import User, Company, Storage, Supplier, Supply, SupplyProduct, Product, Sale, ProductSale
 
 
 #
@@ -36,7 +36,6 @@ class CompanySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'owner', 'owner_email']
 
 
-
 class StorageSerializer(serializers.ModelSerializer):
     # Дополнительное поле
     company_name = serializers.CharField(source='company.title', read_only=True)
@@ -44,6 +43,7 @@ class StorageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Storage
         fields = ['id', 'address', 'company', 'company_name']
+
 
 class SupplierSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.title', read_only=True)
@@ -65,12 +65,14 @@ class ProductSerializer(serializers.ModelSerializer):
                   'sale_price', 'company', 'profit_per_unit', 'company_name']
         read_only_fields = ['id', 'company']
 
+
 class SupplyProductSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
 
     class Meta:
         model = SupplyProduct
         fields = ['id', 'product', 'product_name', 'quantity', 'purchase_price_at_supply']
+
 
 class SupplySerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source='supplier.name', read_only=True)
@@ -83,10 +85,12 @@ class SupplySerializer(serializers.ModelSerializer):
                   'company_name', 'delivery_date', 'products']
         read_only_fields = ['id', 'company', 'delivery_date']
 
+
 class AddProductSupplySerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     quantity = serializers.IntegerField(min_value=1)
     purchase_price_at_supply = serializers.DecimalField(max_digits=10, decimal_places=2)
+
 
 class CreateSupplySerializer(serializers.Serializer):
     supplier = serializers.IntegerField()
@@ -105,6 +109,7 @@ class CreateSupplySerializer(serializers.Serializer):
             raise serializers.ValidationError('Товары в поставке должны быть уникальными')
 
         return value
+
 
 class AttachUserSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False, help_text='Email пользователя')
@@ -144,7 +149,35 @@ class AttachUserSerializer(serializers.Serializer):
         self.context['user_to_attach'] = user
         return value
 
+class ProductSaleSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
 
+    class Meta:
+        model = ProductSale
+        fields = ['id', 'product', 'product_name', 'quantity']
 
+class SaleSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.title', read_only=True)
+    product_sales = ProductSaleSerializer(many=True, read_only=True)
 
+    class Meta:
+        model = Sale
+        fields = ['id', 'buyer_name', 'company', 'company_name', 'sale_date', 'product_sales']
+        read_only_fields = ['id', 'company', 'sale_date']
 
+class ProductSaleCreateSerializer(serializers.Serializer):
+    product = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+class SaleCreateSerializer(serializers.Serializer):
+    buyer_name = serializers.CharField(max_length=250)
+    product_sales = serializers.ListField(child=ProductSaleCreateSerializer(),
+                                          min_length=1,
+                                          help_text='Список товаров в продаже')
+    def validate_product_sales(self, value):
+        product_ids = [item['product'] for item in value]
+        if len(product_ids) != len(set(product_ids)):
+            raise serializers.ValidationError(
+                'Товары в продаже должны быть уникальными'
+            )
+        return value

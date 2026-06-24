@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Company, Storage, Supplier, Supply, Product, SupplyProduct
+from .models import User, Company, Storage, Supplier, Supply, Product, SupplyProduct, Sale, ProductSale
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -41,3 +41,15 @@ class SupplyAdmin(admin.ModelAdmin):
     readonly_fields = ('delivery_date',)
     inlines = (SupplyProductInline,)
 
+class ProductSaleInline(admin.TabularInline):
+    model = ProductSale
+    extra = 1
+    raw_id_fields = ('product',)
+
+@admin.register(Sale)
+class SaleAdmin(admin.ModelAdmin):
+    list_display = ('id', 'buyer_name', 'company', 'sale_date')
+    list_filter = ('company', 'sale_date')
+    readonly_fields = ('sale_date',)
+    inlines = (ProductSaleInline,)
+    date_hierarchy = 'sale_date'

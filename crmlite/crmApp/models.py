@@ -16,11 +16,13 @@ class CustomUserManager(BaseUserManager):
         user.password = make_password(password)  # Хешируем пароль
         user.save(using=self._db)
         return user
+
     # Создание обычного пользователя с соответствующими полномочиями
     def create_user(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
         return self._create_user(email, password, **extra_fields)
+
     # Создание суперпользователя с соответствующими полномочиями
     def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault('is_staff', True)
@@ -36,29 +38,29 @@ class CustomUserManager(BaseUserManager):
 
 class User(AbstractUser):
     """Расширенная модель пользователя"""
-    username = None # Убираем username
+    username = None  # Убираем username
 
     email = models.EmailField(unique=True)
     is_company_owner = models.BooleanField(default=False)
     # Связь с моделью Company многие-к-одному
     company = models.ForeignKey('Company',
-                                null=True, # Пользователь может быть не привязан к компании
-                                on_delete=models.SET_NULL, # Пользователь не удаляется, в поле company=NULL
-                                blank=True, # Можно оставить пустым
-                                related_name='users') # Обратная связь, позволяет получить пользователей
-                                # компании (company.users)
+                                null=True,  # Пользователь может быть не привязан к компании
+                                on_delete=models.SET_NULL,  # Пользователь не удаляется, в поле company=NULL
+                                blank=True,  # Можно оставить пустым
+                                related_name='users')  # Обратная связь, позволяет получить пользователей
+    # компании (company.users)
 
-    objects = CustomUserManager() # Замена стандартного менеджера, кастомным
+    objects = CustomUserManager()  # Замена стандартного менеджера, кастомным
     # Говорим Django, что при аутентификации нужно использовать поле <email>
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
-    def __str__(self):
-        return self.email
-
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+
+    def __str__(self):
+        return self.email
 
 
 class Company(models.Model):
@@ -67,16 +69,16 @@ class Company(models.Model):
     title = models.CharField(max_length=250)
     # Связь Один-к-Одному (один пользователь-одна компания)
     owner = models.OneToOneField('User',
-                                 on_delete=models.CASCADE, # Если пользователь удалён, то и компания будет удалена
-                                 related_name='owned_company', # Обратная связь, получаем компанию пользователя
-                                 verbose_name='Владелец') # Читаемое имя, отображается в админке
-
-    def __str__(self):
-        return f'{self.title} - [{self.inn}]'
+                                 on_delete=models.CASCADE,  # Если пользователь удалён, то и компания будет удалена
+                                 related_name='owned_company',  # Обратная связь, получаем компанию пользователя
+                                 verbose_name='Владелец')  # Читаемое имя, отображается в админке
 
     class Meta:
         verbose_name = 'Компания'
         verbose_name_plural = 'Компании'
+
+    def __str__(self):
+        return f'{self.title} - [{self.inn}]'
 
 
 class Storage(models.Model):
@@ -86,12 +88,12 @@ class Storage(models.Model):
                                 on_delete=models.CASCADE,
                                 related_name='storages')
 
-    def __str__(self):
-        return self.address
-
     class Meta:
         verbose_name = 'Склад'
         verbose_name_plural = 'Склады'
+
+    def __str__(self):
+        return self.address
 
 
 class Supplier(models.Model):
@@ -103,23 +105,21 @@ class Supplier(models.Model):
                                 related_name='suppliers',
                                 verbose_name='Компания')
 
-    def __str__(self):
-        return f'{self.name} ИНН:{self.inn}'
-
     class Meta:
         verbose_name = 'Поставщик'
         verbose_name_plural = 'Поставщики'
         unique_together = ('company', 'inn')
 
-
+    def __str__(self):
+        return f'{self.name} ИНН:{self.inn}'
 
 
 class Product(models.Model):
     """Модель товара"""
     name = models.CharField(max_length=250)
-    description = models.TextField(blank=True) # Необязательное поле
-    quantity = models.PositiveIntegerField(default=0) # Положительное поле, по умолчанию=0
-    purchase_price = models.DecimalField(max_digits=10, decimal_places=2) # Точность 10, знаки после запятой 2
+    description = models.TextField(blank=True)  # Необязательное поле
+    quantity = models.PositiveIntegerField(default=0)  # Положительное поле, по умолчанию=0
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)  # Точность 10, знаки после запятой 2
     sale_price = models.DecimalField(max_digits=10, decimal_places=2)
     company = models.ForeignKey('Company',
                                 on_delete=models.CASCADE,
@@ -136,18 +136,19 @@ class Product(models.Model):
         verbose_name = 'Товар'
         verbose_name_plural = 'Товары'
 
-    def __str__(self):
-        return f'{self.name} - {self.quantity}'
     # Вешаем свойство profit_per_unit для вычисления разницы между ценой закупки и продажи
     @property
     def profit_per_unit(self):
         return self.sale_price - self.purchase_price
 
+    def __str__(self):
+        return f'{self.name} - {self.quantity}'
+
 
 class Supply(models.Model):
     """Модель поставки"""
     supplier = models.ForeignKey('Supplier',
-                                 on_delete=models.PROTECT, # Нельзя удалить поставщика если есть поставки
+                                 on_delete=models.PROTECT,  # Нельзя удалить поставщика если есть поставки
                                  related_name='supplies',
                                  verbose_name='Поставщик')
     company = models.ForeignKey('Company',
@@ -158,7 +159,7 @@ class Supply(models.Model):
     delivery_date = models.DateTimeField(auto_now_add=True)
     # Связь ManyToMany через промежуточную таблицу (одна поставка-много товаров и много поставок-один товар)
     products = models.ManyToManyField('Product',
-                                      through='SupplyProduct', # Указываем промежуточную модель для хранения информации
+                                      through='SupplyProduct',  # Указываем промежуточную модель для хранения информации
                                       related_name='supplies',
                                       verbose_name='Товары в поставке')
 
@@ -173,9 +174,9 @@ class Supply(models.Model):
 class SupplyProduct(models.Model):
     """Промежуточная модель Поставка-Товар"""
     supply = models.ForeignKey('Supply',
-                               on_delete=models.CASCADE) # Если поставка удалена, то и удаляется записи в этой таблице
+                               on_delete=models.CASCADE)  # Если поставка удалена, то и удаляется записи в этой таблице
     product = models.ForeignKey('Product',
-                                on_delete=models.PROTECT) # Нельзя удалить товар если он участвовал в поставке
+                                on_delete=models.PROTECT)  # Нельзя удалить товар если он участвовал в поставке
     quantity = models.PositiveIntegerField()
     purchase_price_at_supply = models.DecimalField(max_digits=10,
                                                    decimal_places=2)
@@ -183,8 +184,47 @@ class SupplyProduct(models.Model):
     class Meta:
         verbose_name = 'Товар в поставке'
         verbose_name_plural = 'Товары в поставке'
-        unique_together = ('supply', 'product') # Гарантия того, что в одной поставке не будет дубликатов одного
+        unique_together = ('supply', 'product')  # Гарантия того, что в одной поставке не будет дубликатов одного
         # товара (например: ноутбук в одной накладной может быть указан только один раз)
 
     def __str__(self):
         return f'{self.product.name} в поставке #{self.supply.id}'
+
+class Sale(models.Model):
+    """Модель продажи"""
+    buyer_name = models.CharField(max_length=250)
+    company = models.ForeignKey('Company',
+                                on_delete=models.CASCADE,
+                                related_name='sales',
+                                verbose_name='Компания'
+                                )
+    sale_date = models.DateTimeField(auto_now_add=True)
+    products = models.ManyToManyField('Product',
+                                      through='ProductSale',
+                                      related_name='sales',
+                                      verbose_name='Товары в продаже')
+
+    class Mets:
+        verbose_name='Продажа'
+        verbose_name_plural='Продажи'
+        ordering=['-sale_date'] # Сортировка по убыванию по полю <sale_date>
+
+    def __str__(self):
+        return f'Продажа #{self.id} от {self.sale_date.strftime('%d.%m.%Y %H:%M')} - {self.buyer_name}'
+
+class ProductSale(models.Model):
+    """Промежуточная таблица для связи продажи и товара"""
+    sale = models.ForeignKey('Sale',
+                             on_delete=models.CASCADE,
+                             related_name='product_sales')
+    product = models.ForeignKey('Product',
+                                on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        verbose_name='Товар в продаже'
+        verbose_name_plural='Товары в продаже'
+        unique_together=('sale', 'product') # Один товар не может быть дважды в одной продаже
+
+    def __str__(self):
+        return f'{self.product.name} в продаже {self.sale.id}'
